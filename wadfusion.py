@@ -133,7 +133,16 @@ def write_progress(stage, **details):
     try:
         with open(temporary_filename, 'w', encoding='utf-8') as progress_file:
             json.dump(progress, progress_file, sort_keys=True, separators=(',', ':'))
-        os.replace(temporary_filename, PROGRESS_FILE)
+        # A polling installer can briefly lock the previous status file on
+        # Windows, preventing an atomic replacement. Do not lose "done".
+        for attempt in range(20):
+            try:
+                os.replace(temporary_filename, PROGRESS_FILE)
+                return
+            except OSError:
+                if attempt == 19:
+                    return
+                time.sleep(0.05)
     except OSError:
         pass
 
