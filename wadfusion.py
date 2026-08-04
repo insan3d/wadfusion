@@ -112,7 +112,17 @@ parser.add_argument('-w', '--wads', help='Search the specified directory path fo
 parser.add_argument('-p', '--patch', help='Patch an existing IPK3 without extracting WADs', action='store_true')
 parser.add_argument('-d', '--deflate', help='Use DEFLATE compression when generating the IPK3', action='store_true')
 parser.add_argument('-e', '--extract-only', help='Skip copying pre-authored lumps and only extract WADs (for developers)', action='store_true')
+parser.add_argument('-b', '--batch', help='Run without confirmation or exit prompts', action='store_true')
 args = parser.parse_args()
+
+def prompt_proceed(prompt):
+    if args.batch:
+        return 'y'
+    return input(prompt)
+
+def prompt_exit(prompt):
+    if not args.batch:
+        input(prompt)
 
 # data tables
 def declare_data():
@@ -1170,7 +1180,7 @@ def source_wads_dirs():
             logg('The specified WADs directory "' + path.realpath(j) + '" does not exist!')
             src_wad_dirs_errors += 1
             if src_wad_dirs_errors == src_wad_dirs_num:
-                input('Press Enter to exit.\n')
+                prompt_exit('Press Enter to exit.\n')
                 logfile.close()
                 return
         if not j.endswith('/'):
@@ -1268,11 +1278,11 @@ def pk3_compress():
 
 def pk3_patch():
     logs('Initialized in patch mode.')
-    i = input('Press Y and then Enter to patch an existing IPK3, anything else to cancel: ')
+    i = prompt_proceed('Press Y and then Enter to patch an existing IPK3, anything else to cancel: ')
     if i.lower() != 'y':
         logg('Canceled.')
         logfile.close()
-        return
+        return 0
     start_time = time.time()
     logg('\nProcessing %s...' % DEST_FILENAME)
     pk3 = ZipFile(DEST_FILENAME, 'r')
@@ -1288,9 +1298,10 @@ def pk3_patch():
     logg('Done!')
     if num_errors > 0:
         logg('%s errors found, see %s for details.' % (num_errors, LOG_FILENAME))
-    input('Press Enter to exit.\n')
+    prompt_exit('Press Enter to exit.\n')
     clear_temp()
     logfile.close()
+    return 0
 
 def main():
     global SRC_WAD_DIR, num_maps, num_eps
@@ -1318,24 +1329,23 @@ def main():
     declare_data()
     # patch an existing ipk3 if --patch argument is used
     if should_patch():
-        pk3_patch()
-        return
+        return pk3_patch()
     # add newgame maps only for present wads
     add_newgame()
     found = get_report_found()
     # bail if no wads in SRC_WAD_DIR
     if len(found) == 0:
         logg('No source WADs found!\nPlease place your WAD files into "%s".' % path.realpath(SRC_WAD_DIR[0]))
-        input('Press Enter to exit.\n')
+        prompt_exit('Press Enter to exit.\n')
         logfile.close()
-        return
+        return 1 if args.batch else 0
     logs('WADs found:\n' + ', '.join(found) + '\n')
     # bail if no iwads in SRC_WAD_DIR
     if not get_wad_filename('doom') and not get_wad_filename('doomu') and not get_wad_filename('doom2') and not get_wad_filename('tnt') and not get_wad_filename('plutonia'):
         logg('No source IWADs found!\nPlease place your IWAD files into "%s".' % path.realpath(SRC_WAD_DIR[0]))
-        input('Press Enter to exit.\n')
+        prompt_exit('Press Enter to exit.\n')
         logfile.close()
-        return
+        return 1 if args.batch else 0
     if args.wads and src_wad_dirs_errors > 0:
         logg('')
     logg('A new IPK3 will be generated with the following episodes:')
@@ -1350,11 +1360,11 @@ def main():
     # deduct iddm1 from the episode tally, since it won't show up in the menu
     if get_wad_filename('iddm1') and get_wad_filename('doom2'):
         num_eps -= 1
-    i = input('\nPress Y and then Enter to proceed, anything else to cancel: ')
+    i = prompt_proceed('\nPress Y and then Enter to proceed, anything else to cancel: ')
     if i.lower() != 'y':
         logg('Canceled.')
         logfile.close()
-        return
+        return 0
     start_time = time.time()
     logg('\nProcessing WADs...')
     # add additional lumps to the pre-defined lump lists
@@ -1375,9 +1385,10 @@ def main():
     logg('Done!')
     if num_errors > 0:
         logg('%s errors found, see %s for details.' % (num_errors, LOG_FILENAME))
-    input('Press Enter to exit.\n')
+    prompt_exit('Press Enter to exit.\n')
     clear_temp()
     logfile.close()
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
