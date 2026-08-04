@@ -16,6 +16,8 @@ Also included is a file called `doom_fusion_widescreen_gfx.pk3`, which adds supe
 
 If the script is run with the `-v` or `--verbose` command line argument, it will print out all the logged information.
 
+For automated use, `--batch` accepts the generation prompt and suppresses the final Enter prompt. It exits with a non-zero status if no supported source WADs or IWADs are found. `--progress-file PATH` writes atomically updated JSON status to `PATH`; its stages are `started`, `scanning`, `ready`, `extracting`, `packaging`, `done`, and `error`.
+
 ## Supported WADs
 
 WadFusion is not a general-purpose tool for merging DOOM WADs; it is for merging *official content only*—it was created out of a desire for a "complete" version of retail DOOM and DOOM II. Please do not ask if WadFusion will support any specific WAD. This includes any content from the 5th generation console ports. If you want to add your own content to a custom IPK3, either modify WadFusion's code yourself, or simply edit the IPK3 that WadFusion generates. Please try consulting the [ZDoom Wiki](https://zdoom.org/wiki/Main_Page) first before asking for help. If you've created an addon for WadFusion, feel free to share it with the community on the [Discussions](https://github.com/Owlet7/wadfusion/discussions/categories/show-and-tell) section.
