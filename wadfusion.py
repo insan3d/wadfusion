@@ -128,7 +128,7 @@ def write_progress(stage, **details):
             os.makedirs(progress_dir)
         temporary_path = progress_path + '.tmp'
         with open(temporary_path, 'w', encoding='utf-8') as progress_file:
-            json.dump(progress, progress_file, sort_keys=True)
+            json.dump(progress, progress_file, sort_keys=True, separators=(',', ':'))
             progress_file.write('\n')
         os.replace(temporary_path, progress_path)
     except OSError:
