@@ -1204,7 +1204,6 @@ def source_wads_dirs():
             src_wad_dirs_errors += 1
             if src_wad_dirs_errors == src_wad_dirs_num:
                 prompt_exit('Press Enter to exit.\n')
-                logfile.close()
                 return
         if not j.endswith('/'):
             j += '/'
