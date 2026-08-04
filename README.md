@@ -27,6 +27,9 @@ WadFusion can be launched with the following command line arguments:
 - `-e`, `--extract-only` — Skip copying pre-authored lumps and only extract WADs (for developers).
 - `-b`, `--batch` — Run without confirmation or exit prompts. In batch mode,
   missing source WADs or IWADs produce a non-zero exit code.
+- `--progress-file PATH` — Write atomic JSON status updates to `PATH`, suitable
+  for a launcher or installer. Stages are `started`, `scanning`, `ready`,
+  `extracting`, `packaging`, `patching`, `done`, and `error`.
 
 ## Supported WADs
 

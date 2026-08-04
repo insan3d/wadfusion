@@ -48,7 +48,7 @@
 ##------------------------------------------------------------------------------------------
 ##
 
-import platform, os, sys, time, fnmatch, argparse
+import platform, os, sys, time, fnmatch, argparse, json
 from shutil import copyfile, rmtree
 from zipfile import ZipFile, ZIP_DEFLATED, ZIP_STORED
 from os import path
@@ -113,7 +113,26 @@ parser.add_argument('-p', '--patch', help='Patch an existing IPK3 without extrac
 parser.add_argument('-d', '--deflate', help='Use DEFLATE compression when generating the IPK3', action='store_true')
 parser.add_argument('-e', '--extract-only', help='Skip copying pre-authored lumps and only extract WADs (for developers)', action='store_true')
 parser.add_argument('-b', '--batch', help='Run without confirmation or exit prompts', action='store_true')
+parser.add_argument('--progress-file', help='Write atomic JSON progress updates to PATH', metavar='PATH')
 args = parser.parse_args()
+
+def write_progress(stage, **details):
+    if not args.progress_file:
+        return
+    progress_path = path.abspath(args.progress_file)
+    progress_dir = path.dirname(progress_path)
+    progress = {'stage': stage, 'timestamp': time.time()}
+    progress.update(details)
+    try:
+        if progress_dir and not path.exists(progress_dir):
+            os.makedirs(progress_dir)
+        temporary_path = progress_path + '.tmp'
+        with open(temporary_path, 'w', encoding='utf-8') as progress_file:
+            json.dump(progress, progress_file, sort_keys=True)
+            progress_file.write('\n')
+        os.replace(temporary_path, progress_path)
+    except OSError:
+        pass
 
 def prompt_proceed(prompt):
     if args.batch:
@@ -948,11 +967,15 @@ def extract_lumps(wad_name):
             lump.to_file(lump_subdir + out_filename)
 
 def extract_iwads():
+    total_wads = len([wad_name for wad_name in WADS if wad_name and get_wad_filename(wad_name)])
+    current_wad = 0
     for iwad_name in WADS:
         wad_filename = get_wad_filename(iwad_name)
         if not wad_filename:
             logs('WAD %s not found' % iwad_name)
             continue
+        current_wad += 1
+        write_progress('extracting', current=current_wad, total=total_wads, wad=iwad_name)
         if iwad_name == 'masterlevels' and not get_wad_filename('doom2'):
             logg('  ERROR: Skipping masterlevels.wad as doom2.wad is not present', error=True)
             continue
@@ -1266,6 +1289,7 @@ def get_eps(wads_found):
     return eps
 
 def pk3_compress():
+    write_progress('packaging')
     logg('Compressing %s...' % DEST_FILENAME)
     pk3 = ZipFile(DEST_FILENAME, 'w', ZIP_DEFLATED if should_deflate() else ZIP_STORED, compresslevel=9)
     for dir_name, x, filenames in os.walk(DEST_DIR):
@@ -1277,6 +1301,7 @@ def pk3_compress():
     pk3.close()
 
 def pk3_patch():
+    write_progress('patching')
     logs('Initialized in patch mode.')
     i = prompt_proceed('Press Y and then Enter to patch an existing IPK3, anything else to cancel: ')
     if i.lower() != 'y':
@@ -1301,6 +1326,7 @@ def pk3_patch():
     prompt_exit('Press Enter to exit.\n')
     clear_temp()
     logfile.close()
+    write_progress('done', output=path.abspath(DEST_FILENAME))
     return 0
 
 def main():
@@ -1316,12 +1342,14 @@ def main():
         args_str += i + ' '
     if args_str != '':
         logs('Command line arguments used: ' + args_str + '\n')
+    write_progress('started')
     # clear out pk3 dir from previous runs
     clear_temp()
     title_line = 'WadFusion v%s' % VERSION
     logg(title_line + '\n' + '-' * len(title_line) + '\n')
     # source_wads/ directory stuff
     source_wads_dirs()
+    write_progress('scanning')
     # support for all the various filenames used by sigil releases
     declare_data_sigil()
     set_sigil_filenames()
@@ -1336,6 +1364,7 @@ def main():
     # bail if no wads in SRC_WAD_DIR
     if len(found) == 0:
         logg('No source WADs found!\nPlease place your WAD files into "%s".' % path.realpath(SRC_WAD_DIR[0]))
+        write_progress('error', message='No source WADs found')
         prompt_exit('Press Enter to exit.\n')
         logfile.close()
         return 1 if args.batch else 0
@@ -1343,6 +1372,7 @@ def main():
     # bail if no iwads in SRC_WAD_DIR
     if not get_wad_filename('doom') and not get_wad_filename('doomu') and not get_wad_filename('doom2') and not get_wad_filename('tnt') and not get_wad_filename('plutonia'):
         logg('No source IWADs found!\nPlease place your IWAD files into "%s".' % path.realpath(SRC_WAD_DIR[0]))
+        write_progress('error', message='No source IWADs found')
         prompt_exit('Press Enter to exit.\n')
         logfile.close()
         return 1 if args.batch else 0
@@ -1360,6 +1390,7 @@ def main():
     # deduct iddm1 from the episode tally, since it won't show up in the menu
     if get_wad_filename('iddm1') and get_wad_filename('doom2'):
         num_eps -= 1
+    write_progress('ready', wads=found)
     i = prompt_proceed('\nPress Y and then Enter to proceed, anything else to cancel: ')
     if i.lower() != 'y':
         logg('Canceled.')
@@ -1388,7 +1419,12 @@ def main():
     prompt_exit('Press Enter to exit.\n')
     clear_temp()
     logfile.close()
+    write_progress('done', output=path.abspath(DEST_FILENAME))
     return 0
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except Exception as error:
+        write_progress('error', message=str(error))
+        raise
