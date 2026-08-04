@@ -1219,8 +1219,11 @@ def get_report_found():
 def clear_temp():
     # clear out temp dir from previous runs
     if path.exists(DEST_DIR):
-        rmtree(DEST_DIR)
-        logs('Removed temp directory from a previous run.\n')
+        try:
+            rmtree(DEST_DIR)
+            logs('Removed temp directory from a previous run.\n')
+        except OSError as error:
+            logg('WARNING: Could not remove temporary directory: %s' % error)
 
 def get_eps(wads_found):
     eps = []
