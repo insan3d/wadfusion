@@ -29,7 +29,10 @@ WadFusion can be launched with the following command line arguments:
   missing source WADs or IWADs produce a non-zero exit code.
 - `--progress-file PATH` — Write atomic JSON status updates to `PATH`, suitable
   for a launcher or installer. Stages are `started`, `scanning`, `ready`,
-  `extracting`, `packaging`, `patching`, `done`, and `error`.
+  `extracting`, `packaging`, `patching`, `done`, and `error`. Extraction updates
+  contain `current`, `total`, and `wad`; individual original Master Levels and
+  Rejects maps also include a `phase` of `masterlevels` or
+  `masterlevelsrejects`.
 
 ## Supported WADs
 
