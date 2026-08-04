@@ -42,12 +42,19 @@ def write_progress(stage, **details):
     try:
         with open(temporary_filename, 'w') as progress_file:
             json.dump(progress, progress_file, sort_keys=True, separators=(',', ':'))
-        if hasattr(os, 'replace'):
-            os.replace(temporary_filename, PROGRESS_FILE)
-        else:
-            if os.path.exists(PROGRESS_FILE):
-                os.remove(PROGRESS_FILE)
-            os.rename(temporary_filename, PROGRESS_FILE)
+        for attempt in range(20):
+            try:
+                if hasattr(os, 'replace'):
+                    os.replace(temporary_filename, PROGRESS_FILE)
+                else:
+                    if os.path.exists(PROGRESS_FILE):
+                        os.remove(PROGRESS_FILE)
+                    os.rename(temporary_filename, PROGRESS_FILE)
+                return
+            except OSError:
+                if attempt == 19:
+                    return
+                time.sleep(0.05)
     except OSError:
         pass
 
