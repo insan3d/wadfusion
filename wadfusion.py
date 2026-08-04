@@ -365,7 +365,10 @@ def add_to_wad_lump_lists():
 
 def extract_master_levels():
     logs('Processing Master Levels...')
+    progress_total = len(MASTER_LEVELS_ORDER) + 1
     for i, wad_name in enumerate(MASTER_LEVELS_ORDER):
+        write_progress('extracting', current=i + 1, total=progress_total,
+                       wad='Master Levels: ' + wad_name, phase='masterlevels')
         in_wad = omg.WAD()
         wad_filename = get_wad_filename(wad_name)
         in_wad.from_file(wad_filename)
@@ -377,6 +380,8 @@ def extract_master_levels():
         map_name = in_wad.maps.find('*')[0]
         extract_map(in_wad, map_name, out_wad_filename)
     # save teeth map32 to map21
+    write_progress('extracting', current=progress_total, total=progress_total,
+                   wad='Master Levels: teeth MAP32', phase='masterlevels')
     wad_filename = get_wad_filename('teeth')
     out_wad_filename = DEST_DIR + 'maps/' + MASTER_LEVELS_MAP_PREFIX + 'MAP21' + '.wad'
     logs('  Extracting %s map32 to %s' % (wad_filename, out_wad_filename))
@@ -410,7 +415,13 @@ def extract_master_levels_rejects():
     global num_maps, should_enable_master_levels_rejects
     should_enable_master_levels_rejects = True
     logs('Processing Master Levels Rejects...')
+    progress_total = 22
+    progress_current = 0
     for i, wad_name in enumerate(MASTER_LEVELS_REJECTS_ORDER):
+        progress_current += 1
+        write_progress('extracting', current=progress_current, total=progress_total,
+                       wad='Master Levels Rejects: ' + wad_name,
+                       phase='masterlevelsrejects')
         in_wad = omg.WAD()
         wad_filename = get_wad_filename(wad_name)
         in_wad.from_file(wad_filename)
@@ -421,12 +432,18 @@ def extract_master_levels_rejects():
         map_name = in_wad.maps.find('*')[0]
         extract_map(in_wad, map_name, out_wad_filename)
     # copy E4M7 to use as John Anderson's 8th Canto
+    progress_current += 1
+    write_progress('extracting', current=progress_current, total=progress_total,
+                   wad='Master Levels Rejects: E4M7', phase='masterlevelsrejects')
     out_wad_filename = DEST_DIR + 'maps/' + 'ML_MAP35.wad'
     e4m7_filename = DEST_DIR + 'maps/' + 'E4M7.wad'
     logs('  Copying %s to %s' % (e4m7_filename, out_wad_filename))
     copyfile(e4m7_filename, out_wad_filename)
     num_maps += 1
     # copy UDTWiD E4M8 into dest dir and set its map lump name
+    progress_current += 1
+    write_progress('extracting', current=progress_current, total=progress_total,
+                   wad='Master Levels Rejects: UDTWiD E4M8', phase='masterlevelsrejects')
     in_wad = omg.WAD()
     wad_filename = get_wad_filename('udtwid')
     in_wad.from_file(wad_filename)
@@ -440,6 +457,10 @@ def extract_master_levels_rejects():
     wad_filename = get_wad_filename('caball')
     in_wad.from_file(wad_filename)
     for map_name in in_wad.maps.find('*'):
+        progress_current += 1
+        write_progress('extracting', current=progress_current, total=progress_total,
+                       wad='Master Levels Rejects: Caball ' + map_name,
+                       phase='masterlevelsrejects')
         out_wad_filename = DEST_DIR + 'maps/' + MASTER_LEVELS_MAP_PREFIX + 'MAP'
         out_wad_filename += str(i + 37) + '.wad'
         logs('  Extracting %s map %s to %s' % (wad_filename, map_name, out_wad_filename))
