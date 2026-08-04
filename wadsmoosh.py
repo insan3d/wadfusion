@@ -6,6 +6,18 @@ from zipfile import ZipFile, ZIP_STORED, ZIP_DEFLATED
 import omg
 
 VERSION_FILENAME = 'version'
+BATCH_MODE = '--batch' in sys.argv[1:]
+COMMAND_LINE_ARGS = [arg for arg in sys.argv[1:] if arg != '--batch']
+input_func = raw_input if sys.version_info.major < 3 else input
+
+def prompt_proceed(prompt):
+    if BATCH_MODE:
+        return 'y'
+    return input_func(prompt)
+
+def prompt_exit(prompt):
+    if not BATCH_MODE:
+        input_func(prompt)
 
 # if False, do a dry run with no actual file writing
 should_extract = True
@@ -73,8 +85,8 @@ def get_wad_filename(wad_name):
 
 def get_master_levels_map_order():
     order = []
-    if len(sys.argv) > 1:
-        order_file = ' '.join(sys.argv[1:])
+    if len(COMMAND_LINE_ARGS) > 0:
+        order_file = ' '.join(COMMAND_LINE_ARGS)
         if not os.path.exists(order_file):
             order_file = ML_ORDER_FILENAME
     else:
@@ -379,13 +391,12 @@ def main():
     title_line = 'WadSmoosh v%s' % version
     logg(title_line + '\n' + '-' * len(title_line))
     found = get_report_found()
-    input_func = raw_input if sys.version_info.major < 3 else input
     # bail if no wads in SRC_WAD_DIR
     if len(found) == 0:
         logg('No source WADs found!\nPlease place your WAD files into %s.' % os.path.realpath(SRC_WAD_DIR))
         logfile.close()
-        input_func('Press Enter to exit.\n')
-        return
+        prompt_exit('Press Enter to exit.\n')
+        return 1 if BATCH_MODE else 0
     # clear out pk3 dir from previous runs
     files_tidied = 0
     for dirname,extensions in TIDY_DIR_EXTENSIONS.items():
@@ -414,11 +425,11 @@ def main():
     for num_eps,ep_name in enumerate(get_eps(found)):
         print('- %s' % ep_name)
     num_eps += 1
-    i = input_func('Press Y and then Enter to proceed, anything else to cancel: ')
+    i = prompt_proceed('Press Y and then Enter to proceed, anything else to cancel: ')
     if i.lower() != 'y':
         logg('Canceled.')
         logfile.close()
-        return
+        return 0
     # make dirs if they don't exist
     if not os.path.exists(DEST_DIR):
         os.mkdir(DEST_DIR)
@@ -489,8 +500,9 @@ def main():
     logg('Generated %s (%.1f MB) with %s maps in %s episodes in %.2f seconds.' % (DEST_FILENAME, ipk3_size, num_maps, num_eps, elapsed_time))
     if num_errors > 0:
         logg('%s errors found, see %s for details.' % (num_errors, LOG_FILENAME))
-    input_func('Press Enter to exit.\n')
+    prompt_exit('Press Enter to exit.\n')
     logfile.close()
+    return 0
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
