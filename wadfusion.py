@@ -130,7 +130,17 @@ def write_progress(stage, **details):
         with open(temporary_path, 'w', encoding='utf-8') as progress_file:
             json.dump(progress, progress_file, sort_keys=True, separators=(',', ':'))
             progress_file.write('\n')
-        os.replace(temporary_path, progress_path)
+        # Inno Setup polls this file while WadFusion is running. On Windows its
+        # short-lived read handle can briefly prevent an atomic replacement.
+        # Retrying keeps the terminal "done" state from being lost.
+        for attempt in range(20):
+            try:
+                os.replace(temporary_path, progress_path)
+                return
+            except PermissionError:
+                if attempt == 19:
+                    return
+                time.sleep(0.05)
     except OSError:
         pass
 
