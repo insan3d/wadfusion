@@ -1,11 +1,62 @@
 
-import os, sys, time
+import os, sys, time, json
 from shutil import copyfile
 from zipfile import ZipFile, ZIP_STORED, ZIP_DEFLATED
 
 import omg
 
 VERSION_FILENAME = 'version'
+BATCH_MODE = False
+PROGRESS_FILE = None
+COMMAND_LINE_ARGS = []
+argument_index = 0
+while argument_index < len(sys.argv[1:]):
+    argument = sys.argv[1:][argument_index]
+    if argument == '--batch':
+        BATCH_MODE = True
+    elif argument == '--progress-file' and argument_index + 1 < len(sys.argv[1:]):
+        argument_index += 1
+        PROGRESS_FILE = sys.argv[1:][argument_index]
+    elif argument.startswith('--progress-file='):
+        PROGRESS_FILE = argument.split('=', 1)[1]
+    else:
+        COMMAND_LINE_ARGS.append(argument)
+    argument_index += 1
+input_func = raw_input if sys.version_info.major < 3 else input
+
+def prompt_proceed(prompt):
+    if BATCH_MODE:
+        return 'y'
+    return input_func(prompt)
+
+def prompt_exit(prompt):
+    if not BATCH_MODE:
+        input_func(prompt)
+
+def write_progress(stage, **details):
+    if not PROGRESS_FILE:
+        return
+    progress = {'stage': stage}
+    progress.update(details)
+    temporary_filename = PROGRESS_FILE + '.tmp'
+    try:
+        with open(temporary_filename, 'w') as progress_file:
+            json.dump(progress, progress_file, sort_keys=True, separators=(',', ':'))
+        for attempt in range(20):
+            try:
+                if hasattr(os, 'replace'):
+                    os.replace(temporary_filename, PROGRESS_FILE)
+                else:
+                    if os.path.exists(PROGRESS_FILE):
+                        os.remove(PROGRESS_FILE)
+                    os.rename(temporary_filename, PROGRESS_FILE)
+                return
+            except OSError:
+                if attempt == 19:
+                    return
+                time.sleep(0.05)
+    except OSError:
+        pass
 
 # if False, do a dry run with no actual file writing
 should_extract = True
@@ -73,8 +124,8 @@ def get_wad_filename(wad_name):
 
 def get_master_levels_map_order():
     order = []
-    if len(sys.argv) > 1:
-        order_file = ' '.join(sys.argv[1:])
+    if len(COMMAND_LINE_ARGS) > 0:
+        order_file = ' '.join(COMMAND_LINE_ARGS)
         if not os.path.exists(order_file):
             order_file = ML_ORDER_FILENAME
     else:
@@ -375,17 +426,19 @@ def get_eps(wads_found):
 
 def main():
     start_time = time.time()
+    write_progress('started')
     version = open(VERSION_FILENAME).readlines()[0].strip()
     title_line = 'WadSmoosh v%s' % version
     logg(title_line + '\n' + '-' * len(title_line))
+    write_progress('scanning')
     found = get_report_found()
-    input_func = raw_input if sys.version_info.major < 3 else input
     # bail if no wads in SRC_WAD_DIR
     if len(found) == 0:
         logg('No source WADs found!\nPlease place your WAD files into %s.' % os.path.realpath(SRC_WAD_DIR))
         logfile.close()
-        input_func('Press Enter to exit.\n')
-        return
+        write_progress('error', message='No source WADs found.')
+        prompt_exit('Press Enter to exit.\n')
+        return 1 if BATCH_MODE else 0
     # clear out pk3 dir from previous runs
     files_tidied = 0
     for dirname,extensions in TIDY_DIR_EXTENSIONS.items():
@@ -414,11 +467,13 @@ def main():
     for num_eps,ep_name in enumerate(get_eps(found)):
         print('- %s' % ep_name)
     num_eps += 1
-    i = input_func('Press Y and then Enter to proceed, anything else to cancel: ')
+    write_progress('ready', wads=found)
+    i = prompt_proceed('Press Y and then Enter to proceed, anything else to cancel: ')
     if i.lower() != 'y':
         logg('Canceled.')
         logfile.close()
-        return
+        write_progress('error', message='Canceled by user.')
+        return 0
     # make dirs if they don't exist
     if not os.path.exists(DEST_DIR):
         os.mkdir(DEST_DIR)
@@ -436,11 +491,16 @@ def main():
         if not get_wad_filename('doom'):
             WAD_LUMP_LISTS['tnt'] += COMMON_LUMPS
     # extract lumps and maps from wads
+    wads_to_extract = [iwad_name for iwad_name in WADS if get_wad_filename(iwad_name)]
+    total_wads = len(wads_to_extract)
+    current_wad = 0
     for iwad_name in WADS:
         wad_filename = get_wad_filename(iwad_name)
         if not wad_filename:
             logg('WAD %s not found' % iwad_name)
             continue
+        current_wad += 1
+        write_progress('extracting', current=current_wad, total=total_wads, wad=iwad_name)
         if iwad_name == 'nerve' and not get_wad_filename('doom2'):
             logg('Skipping nerve.wad as doom2.wad is not present', error=True)
             continue
@@ -474,6 +534,7 @@ def main():
         logg('Copying %s' % genmidi_filename)
         copyfile(RES_DIR + genmidi_filename, DEST_DIR + genmidi_filename)
     # create pk3
+    write_progress('packaging')
     logg('Compressing %s...' % DEST_FILENAME)
     pk3 = ZipFile(DEST_FILENAME, 'w', ZIP_DEFLATED if should_deflate else ZIP_STORED)
     for dir_name, x, filenames in os.walk(DEST_DIR):
@@ -489,8 +550,14 @@ def main():
     logg('Generated %s (%.1f MB) with %s maps in %s episodes in %.2f seconds.' % (DEST_FILENAME, ipk3_size, num_maps, num_eps, elapsed_time))
     if num_errors > 0:
         logg('%s errors found, see %s for details.' % (num_errors, LOG_FILENAME))
-    input_func('Press Enter to exit.\n')
+    prompt_exit('Press Enter to exit.\n')
     logfile.close()
+    write_progress('done', output=os.path.abspath(DEST_FILENAME))
+    return 0
 
 if __name__ == "__main__":
-    main()
+    try:
+        sys.exit(main())
+    except Exception as error:
+        write_progress('error', message=str(error))
+        raise
